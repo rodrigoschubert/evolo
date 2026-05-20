@@ -14,6 +14,8 @@ import '../../../core/widgets/evolo_image.dart';
 import '../../../core/widgets/section_header.dart';
 import '../application/projects_controller.dart';
 import '../domain/evolo_project.dart';
+import '../../account/application/auth_providers.dart';
+import '../../../core/widgets/premium_paywall_sheet.dart';
 
 class ProjectsScreen extends ConsumerWidget {
   const ProjectsScreen({super.key});
@@ -21,6 +23,8 @@ class ProjectsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final projects = ref.watch(projectsControllerProvider);
+    final isPremium = ref.watch(isPremiumUserProvider);
+    final projectsCount = projects.value?.length ?? 0;
 
     return CinematicScaffold(
       child: SafeArea(
@@ -39,9 +43,12 @@ class ProjectsScreen extends ConsumerWidget {
                     ),
                   ),
                   IconButton(
-                    onPressed: () => context.push(AppRoutes.account),
-                    icon: const Icon(Icons.cloud_outlined),
-                    tooltip: 'Conta & Backup',
+                    onPressed: () => context.push(AppRoutes.premium),
+                    icon: Icon(
+                      isPremium ? Icons.workspace_premium : Icons.workspace_premium_outlined,
+                      color: isPremium ? AppColors.amber : null,
+                    ),
+                    tooltip: isPremium ? 'Evolo Pro Ativo' : 'Conhecer Evolo Pro',
                   ),
                   IconButton.filled(
                     onPressed: () => _showCreateProjectSheet(context, ref),
@@ -50,6 +57,31 @@ class ProjectsScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+              if (!isPremium) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceRaised,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.outline.withValues(alpha: 0.5),
+                      width: 0.5,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.amber),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Plano Grátis: $projectsCount de 2 projetos criados',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+                ).animate().fadeIn(duration: 300.ms),
+              ],
               const SizedBox(height: AppSpacing.xl),
               Expanded(
                 child: projects.when(
@@ -84,6 +116,18 @@ class ProjectsScreen extends ConsumerWidget {
     WidgetRef ref,
   ) async {
     debugPrint('Evolo [ProjectsScreen]: _showCreateProjectSheet started');
+
+    final projectsVal = ref.read(projectsControllerProvider).value ?? [];
+    final isPremium = ref.read(isPremiumUserProvider);
+
+    if (!isPremium && projectsVal.length >= 2) {
+      await PremiumPaywallSheet.show(
+        context,
+        title: AppStrings.projectLimitReached,
+        description: AppStrings.projectLimitReachedDesc,
+      );
+      return;
+    }
 
     final project = await showModalBottomSheet<EvoloProject?>(
       context: context,

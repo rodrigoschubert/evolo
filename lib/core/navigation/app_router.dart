@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/account/presentation/account_screen.dart';
+import '../../features/account/presentation/premium_screen.dart';
 import '../../features/capture/presentation/capture_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/projects/presentation/projects_screen.dart';
@@ -15,7 +15,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final uri = state.uri;
       if (uri.scheme == 'evolo' && uri.host == 'login-callback') {
-        return AppRoutes.account;
+        return AppRoutes.premium;
       }
       return null;
     },
@@ -44,8 +44,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ReplayScreen(projectId: state.pathParameters['projectId']!),
       ),
       GoRoute(
-        path: AppRoutes.account,
-        builder: (context, state) => const AccountScreen(),
+        path: AppRoutes.premium,
+        builder: (context, state) => const PremiumScreen(),
       ),
     ],
   );

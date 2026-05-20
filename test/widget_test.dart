@@ -8,7 +8,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(const ProviderScope(child: EvoloApp()));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text(AppStrings.appName), findsNothing);
     expect(find.text(AppStrings.onboardingTitle), findsOneWidget);

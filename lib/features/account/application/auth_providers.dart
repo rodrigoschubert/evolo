@@ -12,6 +12,11 @@ final currentUserProvider = Provider<User?>((ref) {
   return authState?.session?.user ?? SupabaseService.instance.currentUser;
 });
 
+final isPremiumUserProvider = Provider<bool>((ref) {
+  final user = ref.watch(currentUserProvider);
+  return user != null;
+});
+
 final authAnalyticsProvider = Provider<void>((ref) {
   ref.listen<AsyncValue<AuthState>>(authStateProvider, (previous, next) async {
     final prevUser = previous?.value?.session?.user;

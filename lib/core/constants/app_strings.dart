@@ -40,4 +40,36 @@ abstract final class AppStrings {
 
   static const somethingWentWrong = 'Algo saiu do eixo.';
   static const tryAgain = 'Tentar novamente';
+
+  // Evolo Pro & Premium Feature Strings
+  static const premiumTitle = 'Evolo Pro';
+  static const premiumSubtitle = 'Desbloqueie potencial criativo ilimitado.';
+  static const premiumActive = 'Evolo Pro Ativo';
+  static const premiumActiveSubtitle = 'Você tem acesso a todos os recursos ilimitados.';
+  static const freeTier = 'Plano Gratuito';
+  static const freeTierSubtitle = 'Uso local e limites básicos.';
+  static const unlockPremium = 'Assinar Evolo Pro';
+  static const googleSignIn = 'Continuar com o Google';
+  static const logOut = 'Sair da Conta';
+  
+  static const cloudSync = 'Sincronização em nuvem';
+  static const cloudSyncDesc = 'Acesse seus projetos em múltiplos aparelhos com sincronização segura.';
+  static const unlimitedProjects = 'Projetos ilimitados';
+  static const unlimitedProjectsDesc = 'Crie quantos projetos desejar, sem limite de slots.';
+  static const unlimitedCaptures = 'Fotos ilimitadas';
+  static const unlimitedCapturesDesc = 'Adicione quantas fotos precisar em cada projeto.';
+  static const premiumCreativeTools = 'Recursos Criativos Pro';
+  static const premiumCreativeToolsDesc = 'Antes e Depois, exportação em Cinema 4K e transições de timelapse.';
+
+  static const projectLimitReached = 'Limite de projetos atingido';
+  static const projectLimitReachedDesc = 'Você atingiu o limite de 2 projetos no Plano Grátis. Assine o Evolo Pro para criar projetos ilimitados.';
+  
+  static const captureLimitReached = 'Limite de fotos atingido';
+  static const captureLimitReachedDesc = 'Cada projeto suporta até 15 fotos no Plano Grátis. Assine o Evolo Pro para registrar novos momentos.';
+
+  static const lockedFeatureTitle = 'Recurso Premium';
+  static const lockedFeatureBeforeAfterDesc = 'O slider Antes e Depois é exclusivo para assinantes do Evolo Pro.';
+  static const lockedFeature4KDesc = 'Exportações de timelapse em resolução Cinema 4K são exclusivas do Evolo Pro.';
+  static const lockedFeatureTransitionsDesc = 'Transições suaves (Fade, Crossfade) são exclusivas do Evolo Pro.';
+  static const upgradeNow = 'Conhecer Evolo Pro';
 }

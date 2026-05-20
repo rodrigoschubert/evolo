@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_strings.dart';
@@ -17,6 +18,8 @@ import '../../../core/widgets/evolo_image.dart';
 import '../../../core/widgets/glass_panel.dart';
 import '../../projects/application/projects_controller.dart';
 import '../application/capture_controller.dart';
+import '../../account/application/auth_providers.dart';
+import '../../../core/widgets/premium_paywall_sheet.dart';
 
 class CaptureScreen extends ConsumerStatefulWidget {
   const CaptureScreen({required this.projectId, super.key});
@@ -107,6 +110,14 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
   Future<void> _initializeCamera() async {
     debugPrint('Evolo [CaptureScreen]: _initializeCamera starting. _isInitializing=$_isInitializing, mounted=$mounted');
     if (_isInitializing || !mounted) return;
+    
+    // Don't initialize if the app is not in the resumed state (unless it's the very first call)
+    final state = WidgetsBinding.instance.lifecycleState;
+    if (state != null && state != AppLifecycleState.resumed && _cameraController == null) {
+      debugPrint('Evolo [CaptureScreen]: _initializeCamera deferred because app is in state: $state');
+      return;
+    }
+
     _isInitializing = true;
 
     try {
@@ -127,13 +138,31 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
       }
 
       debugPrint('Evolo [CaptureScreen]: Ensuring camera permission...');
+      // Small delay to ensure the system is ready to show a dialog
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (!mounted) return;
+
       final allowed = await PermissionService().ensureCameraPermission();
       debugPrint('Evolo [CaptureScreen]: Camera permission result: allowed=$allowed, mounted=$mounted');
       if (!mounted) return;
 
       if (!allowed) {
         await AnalyticsService.instance.capture(AnalyticsEvent.permissionDenied);
+        
         if (mounted) {
+          final status = await Permission.camera.status;
+          if (status.isPermanentlyDenied) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Permissão de câmera negada permanentemente. Por favor, habilite nas configurações.'),
+                action: SnackBarAction(
+                  label: 'Configurações',
+                  onPressed: openAppSettings,
+                ),
+              ),
+            );
+          }
+
           setState(() {
             _permissionGranted = false;
             _isInitializing = false;
@@ -239,10 +268,23 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
       _disposeController(controller);
       setState(() {});
     } else if (state == AppLifecycleState.resumed) {
+      if (_isInitializing) {
+        debugPrint('Evolo [CaptureScreen]: App resumed but already initializing. Skipping.');
+        return;
+      }
+
       final isInitialized = _cameraController?.value.isInitialized ?? false;
       debugPrint('Evolo [CaptureScreen]: App resumed. _cameraController=${_cameraController?.hashCode}, isInitialized=$isInitialized');
+      
       if (_cameraController == null || !isInitialized) {
-        _initializeCamera();
+        // Only auto-initialize if permission is already granted.
+        PermissionService().hasCameraPermission().then((granted) {
+          if (granted && mounted) {
+            _initializeCamera();
+          } else {
+            debugPrint('Evolo [CaptureScreen]: App resumed but camera permission not granted or widget unmounted.');
+          }
+        });
       }
     }
   }
@@ -356,13 +398,20 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
-                      _CaptureButton(
-                        isSaving: _saving,
-                        onPressed:
-                            _cameraController?.value.isInitialized == true &&
-                                    !_saving
+                      Builder(
+                        builder: (context) {
+                          final isPremium = ref.watch(isPremiumUserProvider);
+                          final capturesCount = item?.captures.length ?? 0;
+                          final isLocked = !isPremium && capturesCount >= 15;
+
+                          return _CaptureButton(
+                            isSaving: _saving,
+                            isLocked: isLocked,
+                            onPressed: _cameraController?.value.isInitialized == true && !_saving
                                 ? _takePicture
                                 : null,
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -379,6 +428,20 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
   }
 
   Future<void> _takePicture() async {
+    final isPremium = ref.read(isPremiumUserProvider);
+    final project = ref.read(projectByIdProvider(widget.projectId)).value;
+    final capturesCount = project?.captures.length ?? 0;
+
+    if (!isPremium && capturesCount >= 15) {
+      HapticFeedback.heavyImpact();
+      await PremiumPaywallSheet.show(
+        context,
+        title: AppStrings.captureLimitReached,
+        description: AppStrings.captureLimitReachedDesc,
+      );
+      return;
+    }
+
     HapticFeedback.mediumImpact();
     final controller = _cameraController;
     if (controller == null || !controller.value.isInitialized) {
@@ -515,8 +578,16 @@ class _PermissionRequest extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.lg),
               FilledButton(
-                onPressed: onPressed,
+                onPressed: () {
+                  debugPrint('Evolo [_PermissionRequest]: Allow Camera button pressed');
+                  onPressed();
+                },
                 child: const Text(AppStrings.allowCamera),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextButton(
+                onPressed: () => PermissionService().openSettings(),
+                child: const Text('Abrir Configurações'),
               ),
             ],
           ),
@@ -570,10 +641,15 @@ class _GridPainter extends CustomPainter {
 }
 
 class _CaptureButton extends StatelessWidget {
-  const _CaptureButton({required this.isSaving, required this.onPressed});
+  const _CaptureButton({
+    required this.isSaving,
+    required this.onPressed,
+    this.isLocked = false,
+  });
 
   final bool isSaving;
   final VoidCallback? onPressed;
+  final bool isLocked;
 
   @override
   Widget build(BuildContext context) {
@@ -590,20 +666,27 @@ class _CaptureButton extends StatelessWidget {
             height: 82,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.warmWhite, width: 2),
+              border: Border.all(
+                color: isLocked ? AppColors.amber : AppColors.warmWhite,
+                width: 2,
+              ),
             ),
             padding: const EdgeInsets.all(7),
             child: DecoratedBox(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isSaving ? AppColors.amber : AppColors.warmWhite,
+                color: isSaving
+                    ? AppColors.amber
+                    : (isLocked ? AppColors.surfaceHigh : AppColors.warmWhite),
               ),
               child: isSaving
                   ? const Padding(
                       padding: EdgeInsets.all(20),
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : null,
+                  : (isLocked
+                      ? const Icon(Icons.lock_outline_rounded, color: AppColors.amber, size: 24)
+                      : null),
             ),
           ),
         ),

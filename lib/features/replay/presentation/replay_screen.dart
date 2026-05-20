@@ -14,6 +14,8 @@ import '../../../core/widgets/cinematic_scaffold.dart';
 import '../../../core/widgets/evolo_image.dart';
 import '../../../core/widgets/before_after_slider.dart';
 import '../../projects/application/projects_controller.dart';
+import '../../account/application/auth_providers.dart';
+import '../../../core/widgets/premium_paywall_sheet.dart';
 
 enum _ViewMode { timelapse, compare }
 
@@ -32,6 +34,8 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
   _ViewMode _viewMode = _ViewMode.timelapse;
   bool _isRendering = false;
   double? _renderingProgress;
+  String _selectedResolution = '1080p';
+  String _selectedTransition = 'cut';
 
   @override
   void initState() {
@@ -85,6 +89,7 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
   @override
   Widget build(BuildContext context) {
     final project = ref.watch(projectByIdProvider(widget.projectId));
+    final isPremium = ref.watch(isPremiumUserProvider);
 
     return CinematicScaffold(
       appBar: AppBar(
@@ -126,20 +131,40 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SegmentedButton<_ViewMode>(
-                    segments: const [
-                      ButtonSegment(
+                    segments: [
+                      const ButtonSegment(
                         value: _ViewMode.timelapse,
                         icon: Icon(Icons.play_circle_outline),
                         label: Text('Timelapse'),
                       ),
                       ButtonSegment(
                         value: _ViewMode.compare,
-                        icon: Icon(Icons.compare),
-                        label: Text('Antes e Depois'),
+                        icon: Icon(
+                          isPremium ? Icons.compare : Icons.lock_outline_rounded,
+                          color: isPremium ? null : AppColors.amber,
+                        ),
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('Antes e Depois'),
+                            if (!isPremium) ...[
+                              const SizedBox(width: 4),
+                              const Icon(Icons.workspace_premium_rounded, size: 12, color: AppColors.amber),
+                            ],
+                          ],
+                        ),
                       ),
                     ],
                     selected: {_viewMode},
-                    onSelectionChanged: (Set<_ViewMode> newSelection) {
+                    onSelectionChanged: (Set<_ViewMode> newSelection) async {
+                      if (newSelection.first == _ViewMode.compare && !isPremium) {
+                        await PremiumPaywallSheet.show(
+                          context,
+                          title: AppStrings.lockedFeatureTitle,
+                          description: AppStrings.lockedFeatureBeforeAfterDesc,
+                        );
+                        return;
+                      }
                       setState(() {
                         _viewMode = newSelection.first;
                       });
@@ -185,6 +210,100 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
                             ),
                     ),
                   ),
+                  if (_viewMode == _ViewMode.timelapse) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    // Transição Selector
+                    Row(
+                      children: [
+                        const Text('Efeito:', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: SegmentedButton<String>(
+                            segments: [
+                              const ButtonSegment(value: 'cut', label: Text('Corte Seco')),
+                              ButtonSegment(
+                                value: 'fade',
+                                label: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text('Crossfade'),
+                                    if (!isPremium) ...[
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.amber),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                            selected: {_selectedTransition},
+                            onSelectionChanged: (val) async {
+                              if (val.first == 'fade' && !isPremium) {
+                                await PremiumPaywallSheet.show(
+                                  context,
+                                  title: AppStrings.lockedFeatureTitle,
+                                  description: AppStrings.lockedFeatureTransitionsDesc,
+                                );
+                                return;
+                              }
+                              setState(() => _selectedTransition = val.first);
+                            },
+                            style: SegmentedButton.styleFrom(
+                              backgroundColor: AppColors.surfaceRaised,
+                              selectedBackgroundColor: AppColors.amber.withValues(alpha: 0.15),
+                              selectedForegroundColor: AppColors.amber,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    // Resolução Selector
+                    Row(
+                      children: [
+                        const Text('Resolução:', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: SegmentedButton<String>(
+                            segments: [
+                              const ButtonSegment(value: '1080p', label: Text('1080p')),
+                              ButtonSegment(
+                                value: '4k',
+                                label: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text('Cinema 4K'),
+                                    if (!isPremium) ...[
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.amber),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                            selected: {_selectedResolution},
+                            onSelectionChanged: (val) async {
+                              if (val.first == '4k' && !isPremium) {
+                                await PremiumPaywallSheet.show(
+                                  context,
+                                  title: AppStrings.lockedFeatureTitle,
+                                  description: AppStrings.lockedFeature4KDesc,
+                                );
+                                return;
+                              }
+                              setState(() => _selectedResolution = val.first);
+                            },
+                            style: SegmentedButton.styleFrom(
+                              backgroundColor: AppColors.surfaceRaised,
+                              selectedBackgroundColor: AppColors.amber.withValues(alpha: 0.15),
+                              selectedForegroundColor: AppColors.amber,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.lg),
                   SizedBox(
                     width: double.infinity,
