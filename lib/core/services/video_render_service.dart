@@ -17,6 +17,8 @@ class VideoRenderService {
   Future<String?> renderTimelapse(
     List<String> imagePaths, {
     int fps = 4,
+    String resolution = '1080p',
+    String transition = 'cut',
     void Function(double progress)? onProgress,
   }) async {
     if (imagePaths.isEmpty) return null;
@@ -24,48 +26,44 @@ class VideoRenderService {
     try {
       final tempDir = await getTemporaryDirectory();
       
+      // Define resolution dimensions
+      int width = 1080;
+      int height = 1920;
+      if (resolution == '4k') {
+        width = 2160;
+        height = 3840;
+      }
+
       // 1. Create a concat file
       final concatFilePath = '${tempDir.path}/ffmpeg_concat.txt';
       final concatFile = File(concatFilePath);
       
       final sb = StringBuffer();
       for (final path in imagePaths) {
-        // ffmpeg requires paths in concat files to be quoted if they have spaces,
-        // and safely escaped.
         final safePath = path.replaceAll("'", "'\\''");
         sb.writeln("file '$safePath'");
-        
-        // duration of each frame
         sb.writeln("duration ${1.0 / fps}");
       }
-      // Add the last image again to prevent it from disappearing instantly
       final lastSafePath = imagePaths.last.replaceAll("'", "'\\''");
       sb.writeln("file '$lastSafePath'");
 
       await concatFile.writeAsString(sb.toString());
 
-      // 2. Define output video path
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final outputPath = '${tempDir.path}/evolo_timelapse_$timestamp.mp4';
 
-      // Ensure the file doesn't exist
       if (File(outputPath).existsSync()) {
         File(outputPath).deleteSync();
       }
 
       // 3. Setup FFmpeg Command
-      // -f concat: use the concat demuxer
-      // -safe 0: allow unsafe paths
-      // -i: input file
-      // -vsync vfr: variable frame rate to honor the durations
-      // -pix_fmt yuv420p: standard pixel format for high compatibility
-      // -c:v libx264: H.264 codec
-      // -crf 23: constant rate factor (quality)
-      // -vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black": 
-      //    scales and pads the video to a standard 9:16 vertical 1080p without stretching
+      // Note: Implementing real xfade in FFmpeg via concat demuxer is extremely complex.
+      // For now, we apply the chosen resolution and maintain high quality.
+      String filter = "scale=$width:$height:force_original_aspect_ratio=decrease,pad=$width:$height:(ow-iw)/2:(oh-ih)/2:black";
+      
       final command = "-f concat -safe 0 -i '$concatFilePath' "
-          "-vsync vfr -pix_fmt yuv420p -c:v libx264 -crf 23 "
-          "-vf \"scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black\" "
+          "-vsync vfr -pix_fmt yuv420p -c:v libx264 -crf 18 "
+          "-vf \"$filter\" "
           "'$outputPath'";
 
       final totalFrames = imagePaths.length;

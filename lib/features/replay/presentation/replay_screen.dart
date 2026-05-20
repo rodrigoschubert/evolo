@@ -36,6 +36,24 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
   double? _renderingProgress;
   String _selectedResolution = '1080p';
   String _selectedTransition = 'cut';
+  double _fps = 4.0; // Default speed
+
+  void _resetTimer() {
+    _timer?.cancel();
+    if (_viewMode == _ViewMode.timelapse) {
+      final interval = (1000 / _fps).round();
+      _timer = Timer.periodic(Duration(milliseconds: interval), (_) {
+        if (!mounted) return;
+        final project = ref.read(projectByIdProvider(widget.projectId));
+        final capturesCount = project.value?.captures.length ?? 0;
+        if (capturesCount > 0) {
+          setState(() => _index = (_index + 1) % capturesCount);
+        }
+      });
+    } else {
+      _timer = null;
+    }
+  }
 
   @override
   void initState() {
@@ -62,6 +80,9 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
 
     final outputPath = await VideoRenderService.instance.renderTimelapse(
       imagePaths,
+      fps: _fps.round(),
+      resolution: _selectedResolution,
+      transition: _selectedTransition,
       onProgress: (progress) {
         if (mounted) {
           setState(() => _renderingProgress = progress);
@@ -112,12 +133,9 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
             }
 
             if (_viewMode == _ViewMode.timelapse) {
-              _timer ??= Timer.periodic(const Duration(milliseconds: 850), (_) {
-                if (!mounted) {
-                  return;
-                }
-                setState(() => _index = (_index + 1) % captures.length);
-              });
+              if (_timer == null) {
+                _resetTimer();
+              }
             } else {
               _timer?.cancel();
               _timer = null;
@@ -184,7 +202,48 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
                               fit: StackFit.expand,
                               children: [
                                 AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 420),
+                                  duration: const Duration(milliseconds: 600),
+                                  layoutBuilder: (currentChild, previousChildren) {
+                                    // Use a custom layout to show the incoming child on top
+                                    // and the outgoing child behind it for the duration.
+                                    return Stack(
+                                      fit: StackFit.expand,
+                                      alignment: Alignment.center,
+                                      children: <Widget>[
+                                        if (previousChildren.isNotEmpty) previousChildren.last,
+                                        if (currentChild != null) currentChild,
+                                      ],
+                                    );
+                                  },
+                                  transitionBuilder: (child, animation) {
+                                    // This animation logic applies to the CHILD ENTERING the screen
+                                    // The child leaving will simply disappear or remain behind 
+                                    // based on the layoutBuilder above.
+                                    
+                                    if (_selectedTransition == 'zoom') {
+                                      return FadeTransition(
+                                        opacity: animation,
+                                        child: ScaleTransition(
+                                          scale: animation.drive(
+                                            Tween(begin: 1.15, end: 1.0).chain(
+                                              CurveTween(curve: Curves.easeOutQuart),
+                                            ),
+                                          ),
+                                          child: child,
+                                        ),
+                                      );
+                                    }
+                                    
+                                    if (_selectedTransition == 'fade') {
+                                      return FadeTransition(
+                                        opacity: animation,
+                                        child: child,
+                                      );
+                                    }
+
+                                    // Default (cut) or others: immediate appearance
+                                    return child;
+                                  },
                                   child: EvoloImage(
                                     source: capture.imagePath,
                                     key: ValueKey(capture.id),
@@ -220,13 +279,14 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
                         Expanded(
                           child: SegmentedButton<String>(
                             segments: [
-                              const ButtonSegment(value: 'cut', label: Text('Corte Seco')),
+                              const ButtonSegment(value: 'cut', label: Text('Corte')),
+                              const ButtonSegment(value: 'fade', label: Text('Fade')),
                               ButtonSegment(
-                                value: 'fade',
+                                value: 'zoom',
                                 label: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Text('Crossfade'),
+                                    const Text('Zoom'),
                                     if (!isPremium) ...[
                                       const SizedBox(width: 4),
                                       const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.amber),
@@ -237,7 +297,7 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
                             ],
                             selected: {_selectedTransition},
                             onSelectionChanged: (val) async {
-                              if (val.first == 'fade' && !isPremium) {
+                              if (val.first == 'zoom' && !isPremium) {
                                 await PremiumPaywallSheet.show(
                                   context,
                                   title: AppStrings.lockedFeatureTitle,
@@ -255,6 +315,39 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
                             ),
                           ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    // Velocidade Selector
+                    Row(
+                      children: [
+                        const Text('Velocidade:', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Slider(
+                            value: _fps,
+                            min: 1,
+                            max: 12,
+                            divisions: 11,
+                            label: '${_fps.round()} fps',
+                            activeColor: AppColors.amber,
+                            onChanged: (val) async {
+                              if (val > 5 && !isPremium) {
+                                await PremiumPaywallSheet.show(
+                                  context,
+                                  title: 'Velocidade Premium',
+                                  description: 'Velocidades acima de 5 FPS são exclusivas para assinantes Evolo Pro.',
+                                );
+                                return;
+                              }
+                              setState(() {
+                                _fps = val;
+                                _resetTimer();
+                              });
+                            },
+                          ),
+                        ),
+                        Text('${_fps.round()} FPS', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.sm),
