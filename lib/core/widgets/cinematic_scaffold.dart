@@ -7,12 +7,14 @@ class CinematicScaffold extends StatelessWidget {
     required this.child,
     this.appBar,
     this.extendBodyBehindAppBar = false,
+    this.bottomNavigationBar,
     super.key,
   });
 
   final PreferredSizeWidget? appBar;
   final Widget child;
   final bool extendBodyBehindAppBar;
+  final Widget? bottomNavigationBar;
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +22,12 @@ class CinematicScaffold extends StatelessWidget {
       extendBodyBehindAppBar: extendBodyBehindAppBar,
       backgroundColor: AppColors.black,
       appBar: appBar,
+      bottomNavigationBar: bottomNavigationBar != null
+          ? SafeArea(
+              top: false,
+              child: bottomNavigationBar!,
+            )
+          : null,
       body: DecoratedBox(
         decoration: const BoxDecoration(
           gradient: LinearGradient(

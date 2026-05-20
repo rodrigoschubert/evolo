@@ -30,58 +30,58 @@ class OnboardingScreen extends ConsumerWidget {
 
         return CinematicScaffold(
           child: SafeArea(
-            child: CustomScrollView(
-              slivers: [
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Spacer(),
-                        _MediaPrelude()
-                            .animate()
-                            .fadeIn(duration: 600.ms)
-                            .slideY(begin: 0.04),
-                        const SizedBox(height: AppSpacing.xl),
-                        Text(
-                          AppStrings.onboardingTitle,
-                          style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ).animate().fadeIn(delay: 120.ms).slideY(begin: 0.05),
-                        const SizedBox(height: AppSpacing.md),
-                        Text(
-                          AppStrings.onboardingBody,
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                color: AppColors.textMuted,
-                              ),
-                        ).animate().fadeIn(delay: 220.ms),
-                        const SizedBox(height: AppSpacing.xl),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            onPressed: () async {
-                              await ref.read(onboardingStoreProvider).complete();
-                              await AnalyticsService.instance.capture(
-                                AnalyticsEvent.onboardingCompleted,
-                              );
-                              if (context.mounted) {
-                                context.go(AppRoutes.projects);
-                              }
-                            },
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 12.0),
-                              child: Text(AppStrings.onboardingCta),
-                            ),
-                          ),
-                        ).animate().fadeIn(delay: 320.ms),
-                      ],
-                    ),
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: AppSpacing.md),
+                  Expanded(
+                    flex: 5,
+                    child: _MediaPrelude()
+                        .animate()
+                        .fadeIn(duration: 600.ms)
+                        .scale(begin: const Offset(0.95, 0.95), curve: Curves.easeOutBack),
                   ),
-                ),
-              ],
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    AppStrings.onboardingTitle,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.5,
+                        ),
+                  ).animate().fadeIn(delay: 120.ms).slideY(begin: 0.1, curve: Curves.easeOut),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    AppStrings.onboardingBody,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textMuted,
+                          height: 1.3,
+                        ),
+                  ).animate().fadeIn(delay: 220.ms),
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () async {
+                        await ref.read(onboardingStoreProvider).complete();
+                        await AnalyticsService.instance.capture(
+                          AnalyticsEvent.onboardingCompleted,
+                        );
+                        if (context.mounted) {
+                          context.go(AppRoutes.projects);
+                        }
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16.0),
+                        child: Text(AppStrings.onboardingCta),
+                      ),
+                    ),
+                  ).animate().fadeIn(delay: 320.ms).slideY(begin: 0.2, curve: Curves.easeOut),
+                  const SizedBox(height: AppSpacing.xl),
+                ],
+              ),
             ),
           ),
         );
@@ -94,53 +94,93 @@ class _MediaPrelude extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AspectRatio(
-      aspectRatio: 1.2,
+      aspectRatio: 0.9,
       child: Stack(
         children: [
+          // Background Placeholder/Image
           Positioned.fill(
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(28),
-              child: DecoratedBox(
+              borderRadius: BorderRadius.circular(32),
+              child: Container(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppColors.surfaceHigh,
-                      AppColors.steelBlue.withValues(alpha: 0.55),
-                      AppColors.black,
-                    ],
+                  color: AppColors.surfaceHigh,
+                  image: const DecorationImage(
+                    image: AssetImage('assets/images/onboarding_hero.png'),
+                    fit: BoxFit.cover,
+                    opacity: 0.8,
+                  ),
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        AppColors.black.withValues(alpha: 0.8),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
+
+          // Floating Badge
           Positioned(
-            left: 18,
-            right: 18,
-            bottom: 18,
+            top: 20,
+            right: 20,
             child: GlassPanel(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 9,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppColors.amber,
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Text(
-                      'Capture hoje. Compare amanhã. Reveja sempre.',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
+                  const Icon(Icons.auto_awesome, color: AppColors.amber, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Time-lapse AI',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                 ],
               ),
+            ),
+          ).animate().fadeIn(delay: 800.ms).scale(),
+
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 20,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.amber,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'NOVO',
+                    style: TextStyle(
+                      color: AppColors.black,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 10,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Capture hoje.\nCompare amanhã.',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        height: 1.1,
+                      ),
+                ),
+              ],
             ),
           ),
         ],

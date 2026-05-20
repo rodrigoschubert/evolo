@@ -152,13 +152,6 @@ class PremiumPaywallSheet extends StatelessWidget {
                 const SizedBox(height: AppSpacing.md),
                 _buildFeatureRow(
                   context,
-                  icon: Icons.cloud_done_outlined,
-                  title: AppStrings.cloudSync,
-                  subtitle: AppStrings.cloudSyncDesc,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _buildFeatureRow(
-                  context,
                   icon: Icons.movie_filter_outlined,
                   title: AppStrings.premiumCreativeTools,
                   subtitle: AppStrings.premiumCreativeToolsDesc,

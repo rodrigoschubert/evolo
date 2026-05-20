@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_strings.dart';
+import '../../../core/navigation/app_routes.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/services/error_tracking_service.dart';
 import '../../../core/theme/app_colors.dart';
@@ -73,7 +75,30 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
         title: Text(isPremium ? AppStrings.premiumActive : AppStrings.premiumTitle),
         elevation: 0,
         backgroundColor: Colors.transparent,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.projects);
+            }
+          },
+        ),
       ),
+      bottomNavigationBar: isPremium
+          ? Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: FilledButton(
+                  onPressed: () => context.go(AppRoutes.projects),
+                  child: const Text('Voltar para Projetos'),
+                ),
+              ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.2),
+            )
+          : null,
       child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
@@ -148,13 +173,6 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                 title: AppStrings.unlimitedCaptures,
                 description: AppStrings.unlimitedCapturesDesc,
               ).animate().fadeIn(delay: 250.ms).slideY(begin: 0.05),
-              const SizedBox(height: AppSpacing.md),
-              _buildFeatureDetail(
-                context,
-                icon: Icons.cloud_done_outlined,
-                title: AppStrings.cloudSync,
-                description: AppStrings.cloudSyncDesc,
-              ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.05),
               const SizedBox(height: AppSpacing.md),
               _buildFeatureDetail(
                 context,
@@ -315,8 +333,6 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                     _buildStatusRow(Icons.check_circle_outline, 'Status da licença: Ativa'),
                     const SizedBox(height: AppSpacing.xs),
                     _buildStatusRow(Icons.all_inclusive, 'Projetos permitidos: Ilimitados'),
-                    const SizedBox(height: AppSpacing.xs),
-                    _buildStatusRow(Icons.sync_outlined, 'Sincronização em nuvem: Habilitada'),
                   ],
                 ),
               ).animate().fadeIn(delay: 250.ms),
