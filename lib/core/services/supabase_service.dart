@@ -33,7 +33,9 @@ class SupabaseService {
   Future<void> signInWithGoogle() async {
     final client = _client;
     if (client == null) {
-      throw StateError('Supabase não foi inicializado. Verifique se passou as chaves de ambiente.');
+      throw StateError(
+        'Supabase não foi inicializado. Verifique se passou as chaves de ambiente.',
+      );
     }
     try {
       await AnalyticsService.instance.capture(AnalyticsEvent.authGoogleStarted);
@@ -53,8 +55,9 @@ class SupabaseService {
     final client = _client;
     if (client == null) return;
     try {
-      await client.auth.signOut();
       await AnalyticsService.instance.capture(AnalyticsEvent.logoutCompleted);
+      await client.auth.signOut();
+      await AnalyticsService.instance.resetUser();
     } catch (e, stack) {
       await ErrorTrackingService.captureException(e, stackTrace: stack);
       rethrow;

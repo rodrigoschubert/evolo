@@ -23,7 +23,15 @@ final authAnalyticsProvider = Provider<void>((ref) {
     final nextUser = next.value?.session?.user;
 
     if (prevUser == null && nextUser != null) {
+      await AnalyticsService.instance.identifyUser(
+        userId: nextUser.id,
+        authProvider: nextUser.appMetadata['provider']?.toString(),
+        isPremium: true,
+        createdAt: nextUser.createdAt,
+      );
       await AnalyticsService.instance.capture(AnalyticsEvent.authGoogleSuccess);
+    } else if (prevUser != null && nextUser == null) {
+      await AnalyticsService.instance.resetUser();
     }
   });
 });

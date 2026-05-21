@@ -1,3 +1,4 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 
 enum AnalyticsEvent {
@@ -28,22 +29,27 @@ class AnalyticsService {
   static final instance = AnalyticsService._();
 
   bool _enabled = false;
+  String? _identifiedUserId;
 
   Future<void> initialize() async {
-    const apiKey = String.fromEnvironment('POSTHOG_API_KEY');
+    const apiKeyFromDefine = String.fromEnvironment('POSTHOG_API_KEY');
+    final apiKey = apiKeyFromDefine.isNotEmpty
+        ? apiKeyFromDefine
+        : dotenv.env['POSTHOG_API_KEY'] ?? '';
     if (apiKey.isEmpty) {
       return;
     }
 
     final config = PostHogConfig(apiKey);
-    config.host = const String.fromEnvironment(
-      'POSTHOG_HOST',
-      defaultValue: 'https://us.i.posthog.com',
-    );
+    const hostFromDefine = String.fromEnvironment('POSTHOG_HOST');
+    config.host = hostFromDefine.isNotEmpty
+        ? hostFromDefine
+        : dotenv.env['POSTHOG_HOST'] ?? 'https://us.i.posthog.com';
     config.captureApplicationLifecycleEvents = true;
 
     await Posthog().setup(config);
     _enabled = true;
+    await _registerAppProperties();
     await capture(AnalyticsEvent.appOpened);
   }
 
@@ -55,6 +61,73 @@ class AnalyticsService {
       return;
     }
 
-    await Posthog().capture(eventName: event.key, properties: properties);
+    try {
+      await Posthog().capture(eventName: event.key, properties: properties);
+    } catch (_) {
+      // Analytics should never block product flows.
+    }
+  }
+
+  Future<void> identifyUser({
+    required String userId,
+    String? authProvider,
+    bool? isPremium,
+    String? createdAt,
+  }) async {
+    if (!_enabled || _identifiedUserId == userId) {
+      return;
+    }
+
+    final userProperties = <String, Object>{};
+    if (authProvider != null && authProvider.isNotEmpty) {
+      userProperties['auth_provider'] = authProvider;
+    }
+    if (isPremium != null) {
+      userProperties['is_premium'] = isPremium;
+    }
+
+    final userPropertiesSetOnce = <String, Object>{};
+    if (createdAt != null && createdAt.isNotEmpty) {
+      userPropertiesSetOnce['created_at'] = createdAt;
+    }
+
+    try {
+      await Posthog().identify(
+        userId: userId,
+        userProperties: userProperties,
+        userPropertiesSetOnce: userPropertiesSetOnce,
+      );
+      _identifiedUserId = userId;
+      await Posthog().reloadFeatureFlags();
+    } catch (_) {
+      // Analytics identity should not affect authentication.
+    }
+  }
+
+  Future<void> resetUser() async {
+    if (!_enabled || _identifiedUserId == null) {
+      return;
+    }
+
+    try {
+      await Posthog().reset();
+      _identifiedUserId = null;
+      await _registerAppProperties();
+    } catch (_) {
+      // Analytics reset should not affect logout.
+    }
+  }
+
+  Future<void> _registerAppProperties() async {
+    const appEnvFromDefine = String.fromEnvironment('APP_ENV');
+    final appEnv = appEnvFromDefine.isNotEmpty
+        ? appEnvFromDefine
+        : dotenv.env['APP_ENV'] ?? 'development';
+
+    try {
+      await Posthog().register('app_env', appEnv);
+    } catch (_) {
+      // Super properties are helpful, but optional.
+    }
   }
 }
