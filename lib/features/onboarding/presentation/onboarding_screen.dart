@@ -30,7 +30,7 @@ class OnboardingScreen extends ConsumerWidget {
 
         return CinematicScaffold(
           child: SafeArea(
-            bottom: false,
+            bottom: true,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
               child: Column(
