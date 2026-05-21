@@ -234,6 +234,18 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
                                       );
                                     }
                                     
+                                    if (_selectedTransition == 'slide') {
+                                      return SlideTransition(
+                                        position: animation.drive(
+                                          Tween<Offset>(
+                                            begin: const Offset(1.0, 0.0),
+                                            end: Offset.zero,
+                                          ).chain(CurveTween(curve: Curves.easeInOutCubic)),
+                                        ),
+                                        child: child,
+                                      );
+                                    }
+
                                     if (_selectedTransition == 'fade') {
                                       return FadeTransition(
                                         opacity: animation,
@@ -275,12 +287,24 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
                     Row(
                       children: [
                         const Text('Efeito:', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
-                        const SizedBox(width: AppSpacing.md),
+                        const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: SegmentedButton<String>(
                             segments: [
                               const ButtonSegment(value: 'cut', label: Text('Corte')),
-                              const ButtonSegment(value: 'fade', label: Text('Fade')),
+                              ButtonSegment(
+                                value: 'fade',
+                                label: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text('Fade'),
+                                    if (!isPremium) ...[
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.amber),
+                                    ],
+                                  ],
+                                ),
+                              ),
                               ButtonSegment(
                                 value: 'zoom',
                                 label: Row(
@@ -294,10 +318,23 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
                                   ],
                                 ),
                               ),
+                              ButtonSegment(
+                                value: 'slide',
+                                label: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text('Slide'),
+                                    if (!isPremium) ...[
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.amber),
+                                    ],
+                                  ],
+                                ),
+                              ),
                             ],
                             selected: {_selectedTransition},
                             onSelectionChanged: (val) async {
-                              if (val.first == 'zoom' && !isPremium) {
+                              if (val.first != 'cut' && !isPremium) {
                                 await PremiumPaywallSheet.show(
                                   context,
                                   title: AppStrings.lockedFeatureTitle,

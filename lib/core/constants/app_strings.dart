@@ -70,6 +70,6 @@ abstract final class AppStrings {
   static const lockedFeatureTitle = 'Recurso Premium';
   static const lockedFeatureBeforeAfterDesc = 'O slider Antes e Depois é exclusivo para assinantes do Evolo Pro.';
   static const lockedFeature4KDesc = 'Exportações de timelapse em resolução Cinema 4K são exclusivas do Evolo Pro.';
-  static const lockedFeatureTransitionsDesc = 'Transições suaves (Fade, Crossfade) são exclusivas do Evolo Pro.';
+  static const lockedFeatureTransitionsDesc = 'O Plano Grátis inclui apenas o efeito de Corte. Transições suaves como Fade e Zoom são exclusivas do Evolo Pro.';
   static const upgradeNow = 'Conhecer Evolo Pro';
 }
