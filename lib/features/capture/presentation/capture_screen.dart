@@ -49,7 +49,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
     super.initState();
     debugPrint('Evolo [CaptureScreen]: initState started for projectId=${widget.projectId}');
     WidgetsBinding.instance.addObserver(this);
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         debugPrint('Evolo [CaptureScreen]: PostFrameCallback fired but widget is not mounted');
@@ -57,7 +57,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
       }
       final route = ModalRoute.of(context);
       debugPrint('Evolo [CaptureScreen]: PostFrameCallback route is ${route?.runtimeType}, isCurrent=${route?.isCurrent}');
-      
+
       if (route != null && route.isCurrent) {
         if (route.animation?.isCompleted == true) {
           debugPrint('Evolo [CaptureScreen]: Route transition is already completed, initializing camera now.');
@@ -110,7 +110,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
   Future<void> _initializeCamera() async {
     debugPrint('Evolo [CaptureScreen]: _initializeCamera starting. _isInitializing=$_isInitializing, mounted=$mounted');
     if (_isInitializing || !mounted) return;
-    
+
     // Don't initialize if the app is not in the resumed state (unless it's the very first call)
     final state = WidgetsBinding.instance.lifecycleState;
     if (state != null && state != AppLifecycleState.resumed && _cameraController == null) {
@@ -148,7 +148,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
 
       if (!allowed) {
         await AnalyticsService.instance.capture(AnalyticsEvent.permissionDenied);
-        
+
         if (mounted) {
           final status = await Permission.camera.status;
           if (status.isPermanentlyDenied) {
@@ -202,7 +202,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
         debugPrint('Evolo [CaptureScreen]: Disposing old camera controller ${oldController.hashCode} before creating new one');
         await _disposeController(oldController);
       }
-      
+
       if (!mounted) {
         debugPrint('Evolo [CaptureScreen]: Widget became unmounted while disposing old controller.');
         return;
@@ -219,7 +219,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
       debugPrint('Evolo [CaptureScreen]: Initializing CameraController ${controller.hashCode}...');
       await controller.initialize();
       debugPrint('Evolo [CaptureScreen]: CameraController ${controller.hashCode} initialized successfully. mounted=$mounted');
-      
+
       if (!mounted) {
         debugPrint('Evolo [CaptureScreen]: Widget became unmounted during initialization, disposing new controller.');
         await controller.dispose();
@@ -275,7 +275,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
 
       final isInitialized = _cameraController?.value.isInitialized ?? false;
       debugPrint('Evolo [CaptureScreen]: App resumed. _cameraController=${_cameraController?.hashCode}, isInitialized=$isInitialized');
-      
+
       if (_cameraController == null || !isInitialized) {
         // Only auto-initialize if permission is already granted.
         PermissionService().hasCameraPermission().then((granted) {
@@ -421,7 +421,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
           );
         },
         error: (_, _) =>
-            const Center(child: Text(AppStrings.somethingWentWrong)),
+        const Center(child: Text(AppStrings.somethingWentWrong)),
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
     );
@@ -530,11 +530,11 @@ class _CameraPreviewLayer extends StatelessWidget {
             if (!context.mounted) return;
             final RenderBox? box = context.findRenderObject() as RenderBox?;
             if (box == null) return;
-            
+
             final offset = box.globalToLocal(details.globalPosition);
             final x = offset.dx / box.size.width;
             final y = offset.dy / box.size.height;
-            
+
             // Check initialized again before calling methods
             if (cameraController.value.isInitialized) {
               cameraController.setFocusPoint(Offset(x, y));
@@ -681,12 +681,12 @@ class _CaptureButton extends StatelessWidget {
               ),
               child: isSaving
                   ? const Padding(
-                      padding: EdgeInsets.all(20),
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
                   : (isLocked
-                      ? const Icon(Icons.lock_outline_rounded, color: AppColors.amber, size: 24)
-                      : null),
+                  ? const Icon(Icons.lock_outline_rounded, color: AppColors.amber, size: 24)
+                  : null),
             ),
           ),
         ),

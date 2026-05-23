@@ -59,7 +59,7 @@ abstract final class AppStrings {
   static const unlimitedCaptures = 'Fotos ilimitadas';
   static const unlimitedCapturesDesc = 'Adicione quantas fotos precisar em cada projeto.';
   static const premiumCreativeTools = 'Recursos Criativos Pro';
-  static const premiumCreativeToolsDesc = 'Antes e Depois, exportação em Cinema 4K e transições de timelapse.';
+  static const premiumCreativeToolsDesc = 'Antes e Depois, Cinema 4K, transições e exportação sem marca d\'água.';
 
   static const projectLimitReached = 'Limite de projetos atingido';
   static const projectLimitReachedDesc = 'Você atingiu o limite de 2 projetos no Plano Grátis. Assine o Evolo Pro para criar projetos ilimitados.';

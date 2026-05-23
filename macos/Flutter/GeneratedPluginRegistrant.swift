@@ -6,7 +6,7 @@ import FlutterMacOS
 import Foundation
 
 import app_links
-import ffmpeg_kit_flutter_new_min_gpl
+import ffmpeg_kit_flutter_new_https_gpl
 import package_info_plus
 import posthog_flutter
 import sentry_flutter

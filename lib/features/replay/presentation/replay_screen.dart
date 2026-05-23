@@ -73,6 +73,8 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
   }
 
   Future<void> _renderVideo(List<String> imagePaths) async {
+    final isPremium = ref.read(isPremiumUserProvider);
+    
     setState(() {
       _isRendering = true;
       _renderingProgress = 0.0;
@@ -83,6 +85,7 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
       fps: _fps.round(),
       resolution: _selectedResolution,
       transition: _selectedTransition,
+      isPremium: isPremium,
       onProgress: (progress) {
         if (mounted) {
           setState(() => _renderingProgress = progress);
@@ -284,76 +287,76 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
                   if (_viewMode == _ViewMode.timelapse) ...[
                     const SizedBox(height: AppSpacing.md),
                     // Transição Selector
-                    Row(
-                      children: [
-                        const Text('Efeito:', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: SegmentedButton<String>(
-                            segments: [
-                              const ButtonSegment(value: 'cut', label: Text('Corte')),
-                              ButtonSegment(
-                                value: 'fade',
-                                label: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text('Fade'),
-                                    if (!isPremium) ...[
-                                      const SizedBox(width: 4),
-                                      const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.amber),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                              ButtonSegment(
-                                value: 'zoom',
-                                label: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text('Zoom'),
-                                    if (!isPremium) ...[
-                                      const SizedBox(width: 4),
-                                      const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.amber),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                              ButtonSegment(
-                                value: 'slide',
-                                label: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text('Slide'),
-                                    if (!isPremium) ...[
-                                      const SizedBox(width: 4),
-                                      const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.amber),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ],
-                            selected: {_selectedTransition},
-                            onSelectionChanged: (val) async {
-                              if (val.first != 'cut' && !isPremium) {
-                                await PremiumPaywallSheet.show(
-                                  context,
-                                  title: AppStrings.lockedFeatureTitle,
-                                  description: AppStrings.lockedFeatureTransitionsDesc,
-                                );
-                                return;
-                              }
-                              setState(() => _selectedTransition = val.first);
-                            },
-                            style: SegmentedButton.styleFrom(
-                              backgroundColor: AppColors.surfaceRaised,
-                              selectedBackgroundColor: AppColors.amber.withValues(alpha: 0.15),
-                              selectedForegroundColor: AppColors.amber,
-                              visualDensity: VisualDensity.compact,
+                    const Text('Efeito:', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                    const SizedBox(height: AppSpacing.sm),
+                    SizedBox(
+                      width: double.infinity,
+                      child: SegmentedButton<String>(
+                        segments: [
+                          const ButtonSegment(value: 'cut', label: Text('Corte')),
+                          ButtonSegment(
+                            value: 'fade',
+                            label: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Fade'),
+                                if (!isPremium) ...[
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.amber),
+                                ],
+                              ],
                             ),
                           ),
+                          ButtonSegment(
+                            value: 'zoom',
+                            label: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Zoom'),
+                                if (!isPremium) ...[
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.amber),
+                                ],
+                              ],
+                            ),
+                          ),
+                          ButtonSegment(
+                            value: 'slide',
+                            label: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Slide'),
+                                if (!isPremium) ...[
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.amber),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                        selected: {_selectedTransition},
+                        onSelectionChanged: (val) async {
+                          if (val.first != 'cut' && !isPremium) {
+                            await PremiumPaywallSheet.show(
+                              context,
+                              title: AppStrings.lockedFeatureTitle,
+                              description: AppStrings.lockedFeatureTransitionsDesc,
+                            );
+                            return;
+                          }
+                          setState(() => _selectedTransition = val.first);
+                        },
+                        style: SegmentedButton.styleFrom(
+                          backgroundColor: AppColors.surfaceRaised,
+                          selectedBackgroundColor: AppColors.amber.withValues(alpha: 0.15),
+                          selectedForegroundColor: AppColors.amber,
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero, // Remove padding interno para caber mais
+                          textStyle: const TextStyle(fontSize: 11), // Diminui levemente a fonte
                         ),
-                      ],
+                      ),
                     ),
+                    const SizedBox(height: AppSpacing.md),
                     const SizedBox(height: AppSpacing.sm),
                     // Velocidade Selector
                     Row(
