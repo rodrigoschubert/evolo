@@ -214,6 +214,7 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
                                       alignment: Alignment.center,
                                       children: <Widget>[
                                         if (previousChildren.isNotEmpty) previousChildren.last,
+                                        // ignore: use_null_aware_elements
                                         if (currentChild != null) currentChild,
                                       ],
                                     );

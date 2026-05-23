@@ -150,9 +150,10 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
         await AnalyticsService.instance.capture(AnalyticsEvent.permissionDenied);
 
         if (mounted) {
+          final messenger = ScaffoldMessenger.of(context);
           final status = await Permission.camera.status;
           if (status.isPermanentlyDenied) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            messenger.showSnackBar(
               SnackBar(
                 content: const Text('Permissão de câmera negada permanentemente. Por favor, habilite nas configurações.'),
                 action: SnackBarAction(

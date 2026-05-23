@@ -7,6 +7,8 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/services/error_tracking_service.dart';
+import '../../../core/services/billing_service.dart';
+import '../../../core/services/analytics_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/cinematic_scaffold.dart';
@@ -23,6 +25,14 @@ class PremiumScreen extends ConsumerStatefulWidget {
 class _PremiumScreenState extends ConsumerState<PremiumScreen> {
   bool _loading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AnalyticsService.instance.capture(AnalyticsEvent.premiumScreenOpened);
+    });
+  }
 
   Future<void> _loginWithGoogle() async {
     setState(() {
@@ -68,11 +78,16 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final isPremium = ref.watch(isPremiumUserProvider);
+    final profile = ref.watch(userProfileProvider).value;
     final isConfigured = SupabaseService.instance.isConfigured;
+    final billingServiceAsync = ref.watch(billingServiceProvider);
+    final billingService = billingServiceAsync.value ?? BillingState();
+
+    final showPremiumActiveUi = isPremium && profile?.premiumSource != 'cache';
 
     return CinematicScaffold(
       appBar: AppBar(
-        title: Text(isPremium ? AppStrings.premiumActive : AppStrings.premiumTitle),
+        title: Text(showPremiumActiveUi ? AppStrings.premiumActive : AppStrings.premiumTitle),
         elevation: 0,
         backgroundColor: Colors.transparent,
         leading: IconButton(
@@ -86,7 +101,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
           },
         ),
       ),
-      bottomNavigationBar: isPremium
+      bottomNavigationBar: showPremiumActiveUi
           ? Padding(
               padding: const EdgeInsets.all(AppSpacing.lg),
               child: SizedBox(
@@ -103,7 +118,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
           children: [
-            if (!isPremium) ...[
+            if (!showPremiumActiveUi) ...[
               // Upgrade Header
               Center(
                 child: Column(
@@ -183,51 +198,138 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
               
               const SizedBox(height: AppSpacing.xl),
 
-              if (_error != null) ...[
-                Text(
-                  _error!,
-                  style: const TextStyle(color: AppColors.danger),
-                  textAlign: TextAlign.center,
-                ).animate().fadeIn(),
-                const SizedBox(height: AppSpacing.md),
+              if (finalErrorStr(billingService) != null) ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                  child: Text(
+                    finalErrorStr(billingService)!,
+                    style: const TextStyle(color: AppColors.danger),
+                    textAlign: TextAlign.center,
+                  ).animate().fadeIn(),
+                ),
               ],
 
-              // Sign In Button
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: FilledButton.icon(
-                  onPressed: (_loading || !isConfigured) ? null : _loginWithGoogle,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.amber,
-                    foregroundColor: AppColors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+              if (user == null) ...[
+                // Sign In Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: FilledButton.icon(
+                    onPressed: (_loading || !isConfigured) ? null : _loginWithGoogle,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.amber,
+                      foregroundColor: AppColors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: _loading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.black),
+                          )
+                        : const Icon(Icons.g_mobiledata, size: 32),
+                    label: const Text(
+                      AppStrings.googleSignIn,
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                   ),
-                  icon: _loading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.black),
-                        )
-                      : const Icon(Icons.g_mobiledata, size: 32),
-                  label: const Text(
-                    AppStrings.googleSignIn,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ),
-              ).animate().fadeIn(delay: 400.ms),
-              
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                'A assinatura do Evolo Pro é vinculada à sua Conta Google. Ao se autenticar, você sincroniza seus dados e libera todas as barreiras.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textMuted,
-                      height: 1.3,
+                ).animate().fadeIn(delay: 400.ms),
+                
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'A assinatura do Evolo Pro é vinculada à sua Conta Google. Ao se autenticar, você sincroniza seus dados e libera todas as barreiras.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textMuted,
+                        height: 1.3,
+                      ),
+                ).animate().fadeIn(delay: 450.ms),
+              ] else ...[
+                // Billing controls for logged in, free users
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: FilledButton.icon(
+                    onPressed: (billingService.isPurchasing || !billingService.isAvailable || billingServiceAsync.isLoading)
+                        ? null
+                        : () async {
+                            setState(() => _error = null);
+                            try {
+                              await ref.read(billingServiceProvider.notifier).purchasePremium();
+                            } catch (e) {
+                              setState(() => _error = 'Falha ao processar pagamento.');
+                            }
+                          },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.amber,
+                      foregroundColor: AppColors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
-              ).animate().fadeIn(delay: 450.ms),
+                    icon: billingService.isPurchasing
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.black),
+                          )
+                        : const Icon(Icons.workspace_premium),
+                    label: Text(
+                      billingService.premiumProduct != null
+                          ? 'Assinar por ${billingService.premiumProduct!.price}'
+                          : AppStrings.unlockPremium,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
+                ).animate().fadeIn(delay: 400.ms),
+                
+                const SizedBox(height: AppSpacing.md),
+                
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: OutlinedButton(
+                    onPressed: (billingService.isPurchasing || !billingService.isAvailable || billingServiceAsync.isLoading)
+                        ? null
+                        : () async {
+                            setState(() => _error = null);
+                            try {
+                              await ref.read(billingServiceProvider.notifier).restorePurchases();
+                              if (context.mounted && !ref.read(isPremiumUserProvider)) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Nenhuma compra anterior localizada.')),
+                                );
+                              }
+                            } catch (e) {
+                              setState(() => _error = 'Erro ao restaurar compras.');
+                            }
+                          },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.warmWhite,
+                      side: const BorderSide(color: AppColors.outline),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text('Restaurar Compras'),
+                  ),
+                ).animate().fadeIn(delay: 450.ms),
+
+                const SizedBox(height: AppSpacing.xl),
+                
+                Center(
+                  child: TextButton.icon(
+                    onPressed: _loading ? null : _logout,
+                    icon: const Icon(Icons.logout, size: 16, color: AppColors.textMuted),
+                    label: const Text(
+                      AppStrings.logOut,
+                      style: TextStyle(color: AppColors.textMuted),
+                    ),
+                  ),
+                ).animate().fadeIn(delay: 500.ms),
+              ],
               
               if (!isConfigured) ...[
                 const SizedBox(height: AppSpacing.lg),
@@ -238,7 +340,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: Text(
-                          'Google Sign-In desativado: Configuração ausente (SUPABASE_URL e SUPABASE_ANON_KEY).',
+                          'Configuração ausente do Supabase (SUPABASE_URL e SUPABASE_ANON_KEY).',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: AppColors.textMuted,
                               ),
@@ -333,6 +435,13 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                     _buildStatusRow(Icons.check_circle_outline, 'Status da licença: Ativa'),
                     const SizedBox(height: AppSpacing.xs),
                     _buildStatusRow(Icons.all_inclusive, 'Projetos permitidos: Ilimitados'),
+                    if (profile?.premiumSource != null) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      _buildStatusRow(
+                        Icons.info_outline,
+                        'Origem: ${getPremiumSourceLabel(profile!.premiumSource!)}',
+                      ),
+                    ],
                   ],
                 ),
               ).animate().fadeIn(delay: 250.ms),
@@ -376,6 +485,27 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
         ),
       ),
     );
+  }
+
+  String? finalErrorStr(BillingState billingState) {
+    return _error ?? billingState.purchaseError;
+  }
+
+  String getPremiumSourceLabel(String source) {
+    switch (source) {
+      case 'google_play':
+        return 'Google Play Store';
+      case 'manual':
+        return 'Concessão Manual';
+      case 'admin':
+        return 'Administrador';
+      case 'promo':
+        return 'Código Promocional';
+      case 'legacy':
+        return 'Legado';
+      default:
+        return source;
+    }
   }
 
   Widget _buildFeatureDetail(

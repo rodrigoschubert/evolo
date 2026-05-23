@@ -3,6 +3,7 @@ import 'analytics_service.dart';
 import 'error_tracking_service.dart';
 import '../../../features/projects/domain/capture_entry.dart';
 import '../../../features/projects/domain/evolo_project.dart';
+import '../../../features/account/domain/user_profile.dart';
 
 /// Handles all remote Supabase sync operations.
 class SupabaseService {
@@ -58,6 +59,43 @@ class SupabaseService {
       await AnalyticsService.instance.capture(AnalyticsEvent.logoutCompleted);
       await client.auth.signOut();
       await AnalyticsService.instance.resetUser();
+    } catch (e, stack) {
+      await ErrorTrackingService.captureException(e, stackTrace: stack);
+      rethrow;
+    }
+  }
+
+  // ── User Profiles ─────────────────────────────────────────────────────────
+
+  /// Obtém o perfil de um usuário no Supabase.
+  Future<EvoloProfile?> getProfile(String userId) async {
+    final client = _client;
+    if (client == null) return null;
+    try {
+      final data = await client.from('profiles').select().eq('id', userId).maybeSingle();
+      if (data == null) return null;
+      return EvoloProfile.fromJson(data);
+    } catch (e, stack) {
+      await ErrorTrackingService.captureException(e, stackTrace: stack);
+      rethrow;
+    }
+  }
+
+  /// Atualiza o status premium de um usuário no Supabase.
+  Future<void> updatePremiumStatus({
+    required String userId,
+    required bool isPremium,
+    required String source,
+  }) async {
+    final client = _client;
+    if (client == null) return;
+    try {
+      await client.from('profiles').update({
+        'is_premium': isPremium,
+        'premium_source': source,
+        'premium_since': isPremium ? DateTime.now().toUtc().toIso8601String() : null,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', userId);
     } catch (e, stack) {
       await ErrorTrackingService.captureException(e, stackTrace: stack);
       rethrow;

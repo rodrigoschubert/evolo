@@ -16,7 +16,14 @@ enum AnalyticsEvent {
   authGoogleStarted('auth_google_started'),
   authGoogleSuccess('auth_google_success'),
   authGoogleFailed('auth_google_failed'),
-  logoutCompleted('logout_completed');
+  logoutCompleted('logout_completed'),
+  premiumScreenOpened('premium_screen_opened'),
+  purchaseStarted('purchase_started'),
+  purchaseSuccess('purchase_success'),
+  purchaseFailed('purchase_failed'),
+  restoreStarted('restore_started'),
+  restoreSuccess('restore_success'),
+  premiumEnabled('premium_enabled');
 
   const AnalyticsEvent(this.key);
 

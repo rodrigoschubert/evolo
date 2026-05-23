@@ -1,4 +1,4 @@
-package com.example.evolo
+package com.rsfsoftware.evolo
 
 import io.flutter.embedding.android.FlutterActivity
 
