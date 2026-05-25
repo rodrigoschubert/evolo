@@ -43,6 +43,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
   bool _saving = false;
   String? _cameraError;
   bool _isInitializing = false;
+  CameraLensDirection _lensDirection = CameraLensDirection.back;
 
   @override
   void initState() {
@@ -179,13 +180,13 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
 
       CameraDescription? camera;
       for (final availableCamera in cameras) {
-        if (availableCamera.lensDirection == CameraLensDirection.back) {
+        if (availableCamera.lensDirection == _lensDirection) {
           camera = availableCamera;
           break;
         }
       }
       camera ??= cameras.isEmpty ? null : cameras.first;
-      debugPrint('Evolo [CaptureScreen]: Selected camera: ${camera?.name}');
+      debugPrint('Evolo [CaptureScreen]: Selected camera: ${camera?.name} (${camera?.lensDirection})');
 
       if (camera == null) {
         if (mounted) {
@@ -329,6 +330,53 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                 ),
               ),
               const _CaptureGrid(),
+              // Ghost Opacity Slider (Vertical on the right edge)
+              if (previousImagePath != null)
+                Positioned(
+                  right: 12,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: RotatedBox(
+                      quarterTurns: 3,
+                      child: SizedBox(
+                        width: 220,
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 1.5,
+                            thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 5,
+                              elevation: 0,
+                              pressedElevation: 0,
+                            ),
+                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+                            activeTrackColor: AppColors.warmWhite.withValues(alpha: 0.4),
+                            inactiveTrackColor: AppColors.warmWhite.withValues(alpha: 0.1),
+                            thumbColor: AppColors.amber.withValues(alpha: 0.8),
+                          ),
+                          child: Slider(
+                            value: _overlayOpacity,
+                            min: AppConstants.minOverlayOpacity,
+                            max: AppConstants.maxOverlayOpacity,
+                            onChanged: (value) {
+                              setState(() => _overlayOpacity = value);
+                            },
+                            onChangeEnd: (value) {
+                              HapticFeedback.selectionClick();
+                              AnalyticsService.instance.capture(
+                                AnalyticsEvent.opacityAdjusted,
+                                properties: {
+                                  'project_id': widget.projectId,
+                                  'opacity': value,
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.md),
@@ -349,6 +397,12 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                             tooltip: AppStrings.cancel,
                           ),
                           const Spacer(),
+                          IconButton.filledTonal(
+                            onPressed: _toggleCamera,
+                            icon: const Icon(Icons.flip_camera_ios_outlined),
+                            tooltip: 'Alternar Câmera',
+                          ),
+                          const Spacer(),
                           Visibility(
                             visible: previousImagePath != null,
                             maintainState: true,
@@ -366,38 +420,6 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                         ],
                       ),
                       const Spacer(),
-                      Visibility(
-                        visible: previousImagePath != null,
-                        maintainState: true,
-                        child: GlassPanel(
-                          child: Row(
-                            children: [
-                              const Icon(Icons.layers_outlined, size: 18),
-                              const SizedBox(width: AppSpacing.sm),
-                              Expanded(
-                                child: Slider(
-                                  value: _overlayOpacity,
-                                  min: AppConstants.minOverlayOpacity,
-                                  max: AppConstants.maxOverlayOpacity,
-                                  onChanged: (value) {
-                                    setState(() => _overlayOpacity = value);
-                                  },
-                                  onChangeEnd: (value) {
-                                    HapticFeedback.selectionClick();
-                                    AnalyticsService.instance.capture(
-                                      AnalyticsEvent.opacityAdjusted,
-                                      properties: {
-                                        'project_id': widget.projectId,
-                                        'opacity': value,
-                                      },
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                       const SizedBox(height: AppSpacing.md),
                       Builder(
                         builder: (context) {
@@ -426,6 +448,18 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
     );
+  }
+
+  Future<void> _toggleCamera() async {
+    if (_isInitializing) return;
+    
+    setState(() {
+      _lensDirection = _lensDirection == CameraLensDirection.back
+          ? CameraLensDirection.front
+          : CameraLensDirection.back;
+    });
+    
+    await _initializeCamera();
   }
 
   Future<void> _takePicture() async {

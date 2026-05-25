@@ -145,6 +145,8 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
             }
 
             final capture = captures[_index % captures.length];
+            // Dynamic duration: transition lasts 40% of the frame's total time
+            final dynamicDuration = Duration(milliseconds: (400 / _fps).round());
 
             return Padding(
               padding: const EdgeInsets.all(AppSpacing.lg),
@@ -205,16 +207,13 @@ class _ReplayScreenState extends ConsumerState<ReplayScreen> {
                               fit: StackFit.expand,
                               children: [
                                 AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 600),
+                                  duration: dynamicDuration,
                                   layoutBuilder: (currentChild, previousChildren) {
-                                    // Use a custom layout to show the incoming child on top
-                                    // and the outgoing child behind it for the duration.
                                     return Stack(
                                       fit: StackFit.expand,
                                       alignment: Alignment.center,
                                       children: <Widget>[
                                         if (previousChildren.isNotEmpty) previousChildren.last,
-                                        // ignore: use_null_aware_elements
                                         if (currentChild != null) currentChild,
                                       ],
                                     );
