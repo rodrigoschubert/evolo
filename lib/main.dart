@@ -12,21 +12,23 @@ import 'core/services/error_tracking_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final bootstrap = AppBootstrap();
-  await bootstrap.initialize();
-
-  FlutterError.onError = (details) {
-    FlutterError.presentError(details);
-    unawaited(ErrorTrackingService.captureFlutterError(details));
-  };
-
-  PlatformDispatcher.instance.onError = (error, stack) {
-    unawaited(ErrorTrackingService.captureException(error, stackTrace: stack));
-    return true;
-  };
-
   await runZonedGuarded(
     () async {
+      debugPrint('Evolo: App starting...');
+      
+      final bootstrap = AppBootstrap();
+      await bootstrap.initialize();
+
+      FlutterError.onError = (details) {
+        FlutterError.presentError(details);
+        unawaited(ErrorTrackingService.captureFlutterError(details));
+      };
+
+      PlatformDispatcher.instance.onError = (error, stack) {
+        unawaited(ErrorTrackingService.captureException(error, stackTrace: stack));
+        return true;
+      };
+
       final sentryDsn = const String.fromEnvironment('SENTRY_DSN');
 
       if (sentryDsn.isEmpty) {
