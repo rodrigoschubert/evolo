@@ -16,7 +16,7 @@ class ProjectStore {
   Future<List<EvoloProject>> loadProjects() async {
     final db = await _databaseService.database;
     final projectsRaw = await db.query('projects', orderBy: 'updatedAt DESC');
-    final capturesRaw = await db.query('captures', orderBy: 'createdAt ASC');
+    final capturesRaw = await db.query('captures', orderBy: 'sortOrder ASC, createdAt ASC');
 
     final capturesByProject = <String, List<CaptureEntry>>{};
     for (final map in capturesRaw) {
@@ -26,6 +26,8 @@ class ProjectStore {
         imagePath: map['imagePath'] as String,
         createdAt: DateTime.parse(map['createdAt'] as String),
         note: map['note'] as String?,
+        source: map['source'] as String?,
+        sortOrder: map['sortOrder'] as int?,
       );
       capturesByProject.putIfAbsent(capture.projectId, () => []).add(capture);
     }
@@ -82,6 +84,8 @@ class ProjectStore {
         'imagePath': capture.imagePath,
         'createdAt': capture.createdAt.toIso8601String(),
         'note': capture.note,
+        'source': capture.source,
+        'sortOrder': capture.sortOrder,
       });
 
       await txn.update(
@@ -93,6 +97,49 @@ class ProjectStore {
         where: 'id = ?',
         whereArgs: [project.id],
       );
+    });
+  }
+
+  /// Batch insert multiple captures in a single transaction.
+  Future<void> addCaptures(List<CaptureEntry> captures, EvoloProject project) async {
+    final db = await _databaseService.database;
+    await db.transaction((txn) async {
+      for (final capture in captures) {
+        await txn.insert('captures', {
+          'id': capture.id,
+          'projectId': capture.projectId,
+          'imagePath': capture.imagePath,
+          'createdAt': capture.createdAt.toIso8601String(),
+          'note': capture.note,
+          'source': capture.source,
+          'sortOrder': capture.sortOrder,
+        });
+      }
+
+      await txn.update(
+        'projects',
+        {
+          'updatedAt': project.updatedAt.toIso8601String(),
+          'coverImagePath': project.coverImagePath,
+        },
+        where: 'id = ?',
+        whereArgs: [project.id],
+      );
+    });
+  }
+
+  /// Update sortOrder for all captures in a project.
+  Future<void> updateCaptureOrder(String projectId, List<String> orderedCaptureIds) async {
+    final db = await _databaseService.database;
+    await db.transaction((txn) async {
+      for (var i = 0; i < orderedCaptureIds.length; i++) {
+        await txn.update(
+          'captures',
+          {'sortOrder': i},
+          where: 'id = ?',
+          whereArgs: [orderedCaptureIds[i]],
+        );
+      }
     });
   }
 

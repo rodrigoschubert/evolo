@@ -5,6 +5,8 @@ class CaptureEntry {
     required this.imagePath,
     required this.createdAt,
     this.note,
+    this.source,
+    this.sortOrder,
   });
 
   final String id;
@@ -13,6 +15,32 @@ class CaptureEntry {
   final DateTime createdAt;
   final String? note;
 
+  /// Origin of this capture: 'camera', 'import', or null (legacy = camera).
+  final String? source;
+
+  /// Manual sort position within the project timeline (lower = earlier).
+  final int? sortOrder;
+
+  CaptureEntry copyWith({
+    String? id,
+    String? projectId,
+    String? imagePath,
+    DateTime? createdAt,
+    String? note,
+    String? source,
+    int? sortOrder,
+  }) {
+    return CaptureEntry(
+      id: id ?? this.id,
+      projectId: projectId ?? this.projectId,
+      imagePath: imagePath ?? this.imagePath,
+      createdAt: createdAt ?? this.createdAt,
+      note: note ?? this.note,
+      source: source ?? this.source,
+      sortOrder: sortOrder ?? this.sortOrder,
+    );
+  }
+
   Map<String, Object?> toJson() {
     return {
       'id': id,
@@ -20,6 +48,8 @@ class CaptureEntry {
       'imagePath': imagePath,
       'createdAt': createdAt.toIso8601String(),
       'note': note,
+      'source': source,
+      'sortOrder': sortOrder,
     };
   }
 
@@ -30,6 +60,8 @@ class CaptureEntry {
       imagePath: json['imagePath']! as String,
       createdAt: DateTime.parse(json['createdAt']! as String),
       note: json['note'] as String?,
+      source: json['source'] as String?,
+      sortOrder: json['sortOrder'] as int?,
     );
   }
 }

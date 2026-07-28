@@ -23,7 +23,11 @@ enum AnalyticsEvent {
   purchaseFailed('purchase_failed'),
   restoreStarted('restore_started'),
   restoreSuccess('restore_success'),
-  premiumEnabled('premium_enabled');
+  premiumEnabled('premium_enabled'),
+  importStarted('import_started'),
+  importCompleted('import_completed'),
+  importFailed('import_failed'),
+  reorderCompleted('reorder_completed');
 
   const AnalyticsEvent(this.key);
 

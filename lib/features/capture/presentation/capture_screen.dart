@@ -20,6 +20,7 @@ import '../../projects/application/projects_controller.dart';
 import '../application/capture_controller.dart';
 import '../../account/application/auth_providers.dart';
 import '../../../core/widgets/premium_paywall_sheet.dart';
+import '../../../core/services/import_service.dart';
 
 class CaptureScreen extends ConsumerStatefulWidget {
   const CaptureScreen({required this.projectId, super.key});
@@ -427,12 +428,31 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                           final capturesCount = item?.captures.length ?? 0;
                           final isLocked = !isPremium && capturesCount >= 15;
 
-                          return _CaptureButton(
-                            isSaving: _saving,
-                            isLocked: isLocked,
-                            onPressed: _cameraController?.value.isInitialized == true && !_saving
-                                ? _takePicture
-                                : null,
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              // Dummy spacer to balance the layout since the capture button is centered
+                              const SizedBox(width: 56), 
+                              
+                              _CaptureButton(
+                                isSaving: _saving,
+                                isLocked: isLocked,
+                                onPressed: _cameraController?.value.isInitialized == true && !_saving
+                                    ? _takePicture
+                                    : null,
+                              ),
+
+                              // Import Button
+                              IconButton.filledTonal(
+                                onPressed: _saving ? null : () => _importImages(isPremium),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: AppColors.surfaceRaised.withValues(alpha: 0.6),
+                                  padding: const EdgeInsets.all(16),
+                                ),
+                                icon: const Icon(Icons.photo_library_outlined, size: 28),
+                                tooltip: 'Importar Fotos',
+                              ),
+                            ],
                           );
                         },
                       ),
@@ -509,6 +529,108 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
     } finally {
       if (mounted) {
         setState(() => _saving = false);
+      }
+    }
+  }
+
+  Future<void> _importImages(bool isPremium) async {
+    if (!isPremium) {
+      HapticFeedback.heavyImpact();
+      await PremiumPaywallSheet.show(
+        context,
+        title: 'Importação Premium',
+        description: 'Faça upgrade para o Evolo Pro para importar fotos da sua galeria e expandir seus projetos sem limites.',
+      );
+      return;
+    }
+
+    final importService = ImportService();
+    final files = await importService.pickImages();
+    if (files == null || files.isEmpty) return;
+
+    if (!mounted) return;
+    
+    await AnalyticsService.instance.capture(
+      AnalyticsEvent.importStarted,
+      properties: {'project_id': widget.projectId, 'selected_count': files.length},
+    );
+
+    final progressNotifier = ValueNotifier<double>(0);
+
+    // Show progress dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Importando Imagens'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Isso pode levar alguns instantes...'),
+            const SizedBox(height: AppSpacing.lg),
+            ValueListenableBuilder<double>(
+              valueListenable: progressNotifier,
+              builder: (context, value, child) {
+                return LinearProgressIndicator(
+                  value: value,
+                  backgroundColor: AppColors.surfaceRaised,
+                  color: AppColors.amber,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final project = ref.read(projectByIdProvider(widget.projectId)).value;
+      final maxSortOrder = project?.captures.fold<int>(
+        -1, 
+        (max, c) => (c.sortOrder ?? -1) > max ? (c.sortOrder ?? -1) : max
+      ) ?? -1;
+
+      final result = await importService.processImages(
+        projectId: widget.projectId,
+        files: files,
+        existingSortOrderMax: maxSortOrder,
+        onProgress: (current, total) {
+          progressNotifier.value = current / total;
+        },
+      );
+
+      await ref.read(projectsControllerProvider.notifier).addCaptures(
+        projectId: widget.projectId,
+        newCaptures: result.captures,
+      );
+      
+      await AnalyticsService.instance.capture(
+        AnalyticsEvent.importCompleted,
+        properties: {
+          'project_id': widget.projectId,
+          'imported_count': result.totalImported,
+          'with_exif_count': result.withExifCount,
+        },
+      );
+
+    } catch (e, stack) {
+      await ErrorTrackingService.captureException(e, stackTrace: stack);
+      await AnalyticsService.instance.capture(
+        AnalyticsEvent.importFailed,
+        properties: {'error': e.toString()},
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao importar algumas imagens.')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        // Dismiss progress dialog
+        Navigator.of(context).pop();
+        // Go back to timeline
+        context.go(AppRoutes.timeline(widget.projectId));
       }
     }
   }

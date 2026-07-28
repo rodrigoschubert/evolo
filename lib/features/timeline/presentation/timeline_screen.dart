@@ -11,32 +11,80 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/cinematic_scaffold.dart';
 import '../../../core/widgets/evolo_image.dart';
 import '../../../core/widgets/section_header.dart';
+import '../../account/application/auth_providers.dart';
 import '../../projects/application/projects_controller.dart';
 import '../../projects/domain/capture_entry.dart';
+import 'package:flutter/services.dart';
+import '../../../core/widgets/premium_paywall_sheet.dart';
+import 'package:flutter_reorderable_grid_view/widgets/reorderable_builder.dart';
 
-class TimelineScreen extends ConsumerWidget {
+class TimelineScreen extends ConsumerStatefulWidget {
   const TimelineScreen({required this.projectId, super.key});
 
   final String projectId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final project = ref.watch(projectByIdProvider(projectId));
+  ConsumerState<TimelineScreen> createState() => _TimelineScreenState();
+}
+
+class _TimelineScreenState extends ConsumerState<TimelineScreen> {
+  bool _isReordering = false;
+  List<CaptureEntry>? _reorderedCaptures;
+
+  @override
+  Widget build(BuildContext context) {
+    final project = ref.watch(projectByIdProvider(widget.projectId));
 
     return CinematicScaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.timeline),
+        title: Text(_isReordering ? 'Reordenar' : AppStrings.timeline),
         actions: [
-          IconButton(
-            onPressed: () => context.push(AppRoutes.replay(projectId)),
-            icon: const Icon(Icons.play_arrow_rounded),
-            tooltip: AppStrings.replay,
-          ),
-          IconButton(
-            onPressed: () => context.push(AppRoutes.capture(projectId)),
-            icon: const Icon(Icons.camera_alt_outlined),
-            tooltip: AppStrings.capture,
-          ),
+          if (_isReordering)
+            TextButton(
+              onPressed: () async {
+                if (_reorderedCaptures != null) {
+                  final ids = _reorderedCaptures!.map((c) => c.id).toList();
+                  await ref.read(projectsControllerProvider.notifier).reorderCaptures(
+                    projectId: widget.projectId,
+                    orderedCaptureIds: ids,
+                  );
+                }
+                setState(() {
+                  _isReordering = false;
+                  _reorderedCaptures = null;
+                });
+              },
+              child: const Text('Salvar', style: TextStyle(color: AppColors.amber)),
+            )
+          else ...[
+            IconButton(
+              onPressed: () async {
+                final isPremium = ref.read(isPremiumUserProvider);
+                if (!isPremium) {
+                  HapticFeedback.heavyImpact();
+                  await PremiumPaywallSheet.show(
+                    context,
+                    title: 'Organização Premium',
+                    description: 'Faça upgrade para o Evolo Pro para reordenar as fotos dos seus projetos livremente.',
+                  );
+                  return;
+                }
+                setState(() => _isReordering = true);
+              },
+              icon: const Icon(Icons.swap_vert),
+              tooltip: 'Reordenar',
+            ),
+            IconButton(
+              onPressed: () => context.push(AppRoutes.replay(widget.projectId)),
+              icon: const Icon(Icons.play_arrow_rounded),
+              tooltip: AppStrings.replay,
+            ),
+            IconButton(
+              onPressed: () => context.push(AppRoutes.capture(widget.projectId)),
+              icon: const Icon(Icons.camera_alt_outlined),
+              tooltip: AppStrings.capture,
+            ),
+          ],
         ],
       ),
       child: SafeArea(
@@ -47,34 +95,51 @@ class TimelineScreen extends ConsumerWidget {
             }
 
             if (item.captures.isEmpty) {
-              return _TimelineEmpty(projectId: projectId);
+              return _TimelineEmpty(projectId: widget.projectId);
             }
+
+            final displayList = _isReordering && _reorderedCaptures != null
+                ? _reorderedCaptures!
+                : item.captures;
 
             return ListView(
               padding: const EdgeInsets.all(AppSpacing.lg),
               children: [
                 SectionHeader(
                   title: item.name,
-                  subtitle: '${item.captures.length} registros visuais',
+                  subtitle: '${displayList.length} registros visuais',
                 ),
                 const SizedBox(height: AppSpacing.xl),
-                _TimelineScrubber(captures: item.captures),
-                const SizedBox(height: AppSpacing.xl),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: item.captures.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: AppSpacing.md,
-                    mainAxisSpacing: AppSpacing.md,
-                    childAspectRatio: 4 / 5,
-                  ),
-                  itemBuilder: (context, index) {
+                if (!_isReordering) _TimelineScrubber(captures: displayList),
+                if (!_isReordering) const SizedBox(height: AppSpacing.xl),
+                ReorderableBuilder(
+                  enableDraggable: _isReordering,
+                  enableLongPress: _isReordering,
+                  onReorder: (ReorderedListFunction reorderedListFunction) {
+                    setState(() {
+                      _reorderedCaptures = reorderedListFunction(displayList) as List<CaptureEntry>;
+                    });
+                  },
+                  children: displayList.asMap().entries.map((entry) {
                     return _TimelineTile(
-                      capture: item.captures[index],
-                      index: index,
-                      projectId: projectId,
+                      key: ValueKey(entry.value.id),
+                      capture: entry.value,
+                      index: entry.key,
+                      projectId: widget.projectId,
+                      isReordering: _isReordering,
+                    );
+                  }).toList(),
+                  builder: (children) {
+                    return GridView(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: AppSpacing.md,
+                        mainAxisSpacing: AppSpacing.md,
+                        childAspectRatio: 4 / 5,
+                      ),
+                      children: children,
                     );
                   },
                 ),
@@ -173,11 +238,14 @@ class _TimelineTile extends ConsumerWidget {
     required this.capture,
     required this.index,
     required this.projectId,
+    this.isReordering = false,
+    super.key,
   });
 
   final CaptureEntry capture;
   final int index;
   final String projectId;
+  final bool isReordering;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -212,11 +280,25 @@ class _TimelineTile extends ConsumerWidget {
               style: Theme.of(context).textTheme.labelLarge,
             ),
           ),
-          Positioned(
-            top: 0,
-            right: 0,
-            child: PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: AppColors.warmWhite, size: 20),
+          if (isReordering)
+            Positioned(
+              top: AppSpacing.sm,
+              right: AppSpacing.sm,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppColors.black.withValues(alpha: 0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.drag_indicator, color: AppColors.warmWhite, size: 20),
+              ),
+            )
+          else
+            Positioned(
+              top: 0,
+              right: 0,
+              child: PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: AppColors.warmWhite, size: 20),
               color: AppColors.surfaceRaised,
               onSelected: (value) async {
                 if (value == 'delete') {

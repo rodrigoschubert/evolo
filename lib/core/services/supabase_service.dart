@@ -135,6 +135,8 @@ class SupabaseService {
       'user_id': userId,
       'image_path': capture.imagePath,
       'note': capture.note,
+      'source': capture.source,
+      'sort_order': capture.sortOrder,
       'created_at': capture.createdAt.toUtc().toIso8601String(),
     });
   }

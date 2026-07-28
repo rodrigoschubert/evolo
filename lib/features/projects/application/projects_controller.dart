@@ -71,43 +71,133 @@ class ProjectsController extends AsyncNotifier<List<EvoloProject>> {
     final current = state.value ?? await future;
     final now = DateTime.now();
 
+    final projectIndex = current.indexWhere((p) => p.id == projectId);
+    if (projectIndex == -1) return;
+    
+    final project = current[projectIndex];
+    final maxSortOrder = project.captures.fold<int>(
+      -1, 
+      (max, c) => (c.sortOrder ?? -1) > max ? (c.sortOrder ?? -1) : max
+    );
+
     final capture = CaptureEntry(
       id: _uuid.v4(),
       projectId: projectId,
       imagePath: imagePath,
       createdAt: now,
+      source: 'camera',
+      sortOrder: maxSortOrder + 1,
     );
 
-    final updated = current.map((project) {
-      if (project.id != projectId) {
-        return project;
-      }
+    final captures = [...project.captures, capture];
 
-      final captures = [...project.captures, capture];
+    final updatedProject = project.copyWith(
+      updatedAt: now,
+      coverImagePath: imagePath,
+      captures: captures,
+    );
 
-      return project.copyWith(
-        updatedAt: now,
-        coverImagePath: imagePath,
-        captures: captures,
-      );
-    }).toList()..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final updated = [...current];
+    updated[projectIndex] = updatedProject;
+    updated.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
     state = AsyncData(updated);
 
-    final project = updated.firstWhere((item) => item.id == projectId);
-    await ref.read(projectStoreProvider).addCapture(capture, project);
+    await ref.read(projectStoreProvider).addCapture(capture, updatedProject);
     // Sync to cloud fire-and-forget
     unawaited(SupabaseService.instance.upsertCapture(capture));
-    unawaited(SupabaseService.instance.upsertProject(project));
+    unawaited(SupabaseService.instance.upsertProject(updatedProject));
     await AnalyticsService.instance.capture(
-      project.captures.length == 1
+      updatedProject.captures.length == 1
           ? AnalyticsEvent.firstCaptureTaken
           : AnalyticsEvent.captureAdded,
       properties: {
         'project_id': projectId,
-        'capture_count': project.captures.length,
+        'capture_count': updatedProject.captures.length,
+        'source': 'camera',
       },
     );
+  }
+
+  /// Adds multiple imported captures in a batch transaction.
+  Future<void> addCaptures({
+    required String projectId,
+    required List<CaptureEntry> newCaptures,
+  }) async {
+    if (newCaptures.isEmpty) return;
+
+    final current = state.value ?? await future;
+    final now = DateTime.now();
+
+    final projectIndex = current.indexWhere((p) => p.id == projectId);
+    if (projectIndex == -1) return;
+
+    final project = current[projectIndex];
+    final captures = [...project.captures, ...newCaptures];
+
+    final updatedProject = project.copyWith(
+      updatedAt: now,
+      coverImagePath: newCaptures.last.imagePath,
+      captures: captures,
+    );
+
+    final updated = [...current];
+    updated[projectIndex] = updatedProject;
+    updated.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    state = AsyncData(updated);
+
+    await ref.read(projectStoreProvider).addCaptures(newCaptures, updatedProject);
+    
+    // Sync to cloud fire-and-forget
+    for (final capture in newCaptures) {
+      unawaited(SupabaseService.instance.upsertCapture(capture));
+    }
+    unawaited(SupabaseService.instance.upsertProject(updatedProject));
+  }
+
+  /// Reorders existing captures within a project.
+  Future<void> reorderCaptures({
+    required String projectId,
+    required List<String> orderedCaptureIds,
+  }) async {
+    final current = state.value ?? await future;
+    final projectIndex = current.indexWhere((p) => p.id == projectId);
+    if (projectIndex == -1) return;
+
+    final project = current[projectIndex];
+    
+    // Create a new list of captures with updated sortOrder
+    final updatedCaptures = project.captures.map((capture) {
+      final newIndex = orderedCaptureIds.indexOf(capture.id);
+      if (newIndex != -1 && capture.sortOrder != newIndex) {
+        return capture.copyWith(sortOrder: newIndex);
+      }
+      return capture;
+    }).toList();
+    
+    // Sort the list so the UI reflects the new order immediately
+    updatedCaptures.sort((a, b) {
+      final orderA = a.sortOrder ?? 0;
+      final orderB = b.sortOrder ?? 0;
+      if (orderA == orderB) {
+         return a.createdAt.compareTo(b.createdAt);
+      }
+      return orderA.compareTo(orderB);
+    });
+
+    final updatedProject = project.copyWith(captures: updatedCaptures);
+    final updated = [...current];
+    updated[projectIndex] = updatedProject;
+    
+    state = AsyncData(updated);
+
+    await ref.read(projectStoreProvider).updateCaptureOrder(projectId, orderedCaptureIds);
+    
+    // Sync to cloud fire-and-forget
+    for (final capture in updatedCaptures) {
+       unawaited(SupabaseService.instance.upsertCapture(capture));
+    }
   }
 
   Future<void> deleteProject(String projectId) async {

@@ -19,8 +19,9 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -42,9 +43,40 @@ class DatabaseService {
         imagePath TEXT NOT NULL,
         createdAt TEXT NOT NULL,
         note TEXT,
+        source TEXT,
+        sortOrder INTEGER,
         FOREIGN KEY (projectId) REFERENCES projects (id) ON DELETE CASCADE
       )
     ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE captures ADD COLUMN source TEXT');
+      await db.execute('ALTER TABLE captures ADD COLUMN sortOrder INTEGER');
+
+      // Backfill sortOrder for existing captures based on createdAt order
+      final captures = await db.rawQuery(
+        'SELECT id, projectId, createdAt FROM captures ORDER BY projectId, createdAt ASC',
+      );
+
+      String? currentProjectId;
+      int order = 0;
+      for (final row in captures) {
+        final pid = row['projectId'] as String;
+        if (pid != currentProjectId) {
+          currentProjectId = pid;
+          order = 0;
+        }
+        await db.update(
+          'captures',
+          {'sortOrder': order},
+          where: 'id = ?',
+          whereArgs: [row['id']],
+        );
+        order++;
+      }
+    }
   }
 
   Future<void> close() async {
